@@ -1,5 +1,6 @@
 declare namespace botkit {
   function consolebot(configuration: ConsoleConfiguration): ConsoleController;
+  function facebookbot(configuration: FacebookConfiguration): FacebookController;
   function slackbot(configuration: SlackConfiguration): SlackController;
   function sparkbot(configuration: CiscoSparkConfiguration): CiscoSparkController;
   interface Bot<E, M extends Message> {
@@ -34,7 +35,6 @@ declare namespace botkit {
     webhook_name?: string;
   }
   interface CiscoSparkController extends Controller<CiscoSparkEventType, CiscoSparkMessage, CiscoSparkBot> {
-    spawn(config: {}, cb?: (worker: CiscoSparkBot) => void): CiscoSparkBot;
   }
   interface CiscoSparkMessage extends Message {
     actorId?: string;
@@ -59,7 +59,6 @@ declare namespace botkit {
   interface ConsoleConfiguration extends Configuration {
   }
   interface ConsoleController extends Controller<ConsoleEventType, ConsoleMessage, ConsoleBot> {
-    spawn(config?: {}, cb?: (worker: ConsoleBot) => void): ConsoleBot;
   }
   interface ConsoleMessage extends Message {
   }
@@ -77,6 +76,7 @@ declare namespace botkit {
     hears(keywords: string | string[] | RegExp | RegExp[], events: string | string[], middleware_or_cb: HearsFunction<M>, cb: HearsCallback<E, M, B>): this;
     on(event: E, cb: HearsCallback<E, M, B>): this;
     setupWebserver(port: number | string, cb: (err: Error, webserver: any) => void): this;
+    spawn(config?: { token?: string; }, cb?: (worker: B) => void): B;
     startTicking(): void;
   }
   interface Conversation<M extends Message> {
@@ -104,6 +104,62 @@ declare namespace botkit {
   interface ConversationCaptureOptions {
     key?: string;
     multiple?: boolean;
+  }
+  interface FacebookAttachment {
+    type: 'audio' | 'file' | 'image' | 'video';
+    payload: any;
+  }
+  interface FacebookBot extends Bot<FacebookEventType, FacebookMessage> {
+    replyWithTyping(src: FacebookMessage, resp: string | FacebookMessage, cb?: (err: Error) => void): void;
+    startTyping(src: FacebookMessage, cb?: (err: Error) => void): void;
+    stopTyping(src: FacebookMessage, cb?: (err: Error) => void): void;
+  }
+  interface FacebookConfiguration extends Configuration {
+    access_token: string;
+    app_secret?: string;
+    receive_via_postback?: boolean;
+    require_delivery?: boolean;
+    validate_requests?: boolean;
+    verify_token: string;
+  }
+  interface FacebookController extends Controller<FacebookEventType, FacebookMessage, FacebookBot> {
+    readonly api: {
+      attachment_upload: {
+        upload(attachment: FacebookAttachment, cb: (err: Error, attachment_id: string) => void): void;
+      };
+      messenger_profile: any;
+      thread_settings: any;
+    };
+  }
+  interface FacebookMessage extends Message {
+    attachment?: FacebookAttachment;
+    notification_type: 'REGULAR' | 'SILENT_PUSH' | 'NO_PUSH';
+    payload?: string;
+    sender_action?: 'typing_on' | 'typing_off';
+  }
+  interface FacebookMessengerProfileAPI {
+    account_linking(payload: string): void;
+    delete_account_linking(): void;
+    delete_domain_whitelist(): void;
+    delete_get_started(): void;
+    delete_greeting(): void;
+    delete_home_url(): void;
+    delete_menu(): void;
+    delete_target_audience(): void;
+    domain_whitelist(payload: string | string[]): void;
+    get_account_linking(cb: (err: Error, body: any) => void): void;
+    get_domain_whitelist(cb: (err: Error, body: any) => void): void;
+    get_get_started(cb: (err: Error, body: any) => void): void;
+    get_greeting(cb: (err: Error, body: any) => void): void;
+    get_home_url(cb: (err: Error, body: any) => void): void;
+    get_started(payload: string): void;
+    get_menu(cb: (err: Error, body: any) => void): void;
+    get_messenger_code(image_size: number, cb: (err: Error, uri: string) => void, ref?: string): void;
+    get_target_audience(cb: (err: Error, body: any) => void): void;
+    greeting(payload: string | { locale: string; text: string; }[]): void;
+    home_url(payload: { url: string; webview_height_ratio: 'tall'; webview_share_button?: 'show' | 'hide'; in_test?: boolean; }): void;
+    menu(payload: any): void;
+    target_audience(payload: { audience_type: 'all' | 'custom' | 'none'; countries?: { blacklist?: string[]; whitelist?: string[]; }; }): void;
   }
   interface Identity {
     name: string;
@@ -144,8 +200,8 @@ declare namespace botkit {
     createPrivateConversation(message: SlackMessage & { user: string; }, cb: (err: Error, convo: Conversation<SlackMessage>) => void): void;
     closeRTM(): void;
     destroy(): void;
-    identifyTeam();
-    identifyBot();
+    identifyTeam(): string;
+    identifyBot(): { id: string; name: string; team_id: string; };
     replyAcknowledge(cb?: (err: Error) => void): void;
     replyAndUpdate(src: SlackMessage, resp: string | SlackMessage, cb: (err: Error, res: string) => void): void;
     replyInThread(src: SlackMessage, resp: string | SlackMessage, cb: (err: Error, res: string) => void): void;
@@ -154,7 +210,6 @@ declare namespace botkit {
     replyPublic(src: SlackMessage, resp: string | SlackMessage, cb?: (err: Error) => void): void;
     replyPublicDelayed(src: SlackMessage, resp: string | SlackMessage, cb?: (err: Error) => void): void;
     replyInteractive(src: SlackMessage, resp: string | SlackMessage, cb?: (err: Error) => void): void;
-    say();
     sendWebhook(options: SlackMessage, cb: (err: string, body: any) => void): void;
     startPrivateConversation(message: SlackMessage & { user: string; }, cb: (err: Error, convo: Conversation<SlackMessage>) => void): void;
     startConversationInThread(src: SlackMessage, cb: (err: Error, res: string) => void): void;
@@ -180,7 +235,6 @@ declare namespace botkit {
     createOauthEndpoints(webserver: any, callback: (err: Error, req: any, res: any) => void): this;
     setupWebserver();
     getAuthorizeURL(team_id: string, redirect_params: any): string;
-    spawn(config: { token: string }, cb?: (worker: SlackBot) => void): SlackBot;
   }
   interface SlackMessage extends Message {
     attachments?: SlackAttachment[];
@@ -357,6 +411,13 @@ declare namespace botkit {
   type ConsoleEventType = 'message_received';
   type ConversationCallback<M extends Message> = ((message: M, convo: Conversation<M>) => void) | ({ pattern?: string | RegExp; default?: boolean; callback: (message: M, convo: Conversation<M>) => void; }[]);
   type ConversationStatusType = 'completed' | 'active' | 'stopped' | 'timeout' | 'ending' | 'inactive';
+  type FacebookEventType = 'facebook_account_linking' |
+    'facebook_optin' |
+    'facebook_postback' |
+    'facebook_referral' |
+    'message_delivered' |
+    'message_read' |
+    'message_received';
   type HearsCallback<E, M extends Message, B extends Bot<E, M>> = (bot: B, message: M) => void;
   type HearsFunction<M extends Message> = (tests: string | string[] | RegExp | RegExp[], message: M) => boolean;
   type SlackEventType = 'ambient' |
