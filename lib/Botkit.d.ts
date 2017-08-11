@@ -2,10 +2,6 @@ declare namespace botkit {
   function consolebot(configuration: ConsoleConfiguration): ConsoleController;
   function slackbot(configuration: SlackConfiguration): SlackController;
   function sparkbot(configuration: CiscoSparkConfiguration): CiscoSparkController;
-  // function facebookbot(configuration: Configuration): Controller;
-  // function twilioipmbot(configuration: Configuration): Controller;
-  // function twiliosmsbot(configuration: Configuration): Controller;
-  // function botframeworkbot(configuration: Configuration): Controller;
   interface Bot<M extends Message> {
     createConversation(message: M, cb: (err: Error, convo: Conversation<M>) => void): void;
     reply(src: M, resp: string | M, cb?: (err: Error, res: any) => void): void;
