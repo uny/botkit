@@ -11,10 +11,10 @@ declare namespace botkit {
     reply(src: M, resp: string | M, cb?: (err: Error, res: any) => void): void;
     startConversation(message: M, cb: (err: Error, convo: Conversation<M>) => void): void;
   }
-  interface Controller<B, E, M extends Message> {
+  interface Controller<E, M extends Message, B extends Bot<M>> {
     createWebhookEndpoints(webserver: any, authenticationTokens?: string[]): this;
-    hears(keywords: string | string[] | RegExp | RegExp[], events: string | string[], middleware_or_cb: HearsFunction<M> | HearsCallback<B, M>, cb?: HearsCallback<B, M>): this;
-    on(event: E, cb: HearsCallback<B, M>): this;
+    hears(keywords: string | string[] | RegExp | RegExp[], events: string | string[], middleware_or_cb: HearsFunction<M> | HearsCallback<M, B>, cb?: HearsCallback<M, B>): this;
+    on(event: E, cb: HearsCallback<M, B>): this;
     setupWebserver(port: number | string, cb: (err: Error, webserver: any) => void): this;
     startTicking(): void;
   }
@@ -106,7 +106,7 @@ declare namespace botkit {
     send_via_rtm?: boolean;
     stale_connection_timeout?: number;
   }
-  interface SlackController extends Controller<SlackBot, SlackEventType, SlackMessage> {
+  interface SlackController extends Controller<SlackEventType, SlackMessage, SlackBot> {
     configureSlackApp(config: { clientId: string; clientSecret: string; redirectUri: string; scopes: string[]; }): this;
     createHomepageEndpoint(webserver: any): this;
     createOauthEndpoints(webserver: any, callback: (err: Error, req: any, res: any) => void): this;
@@ -267,7 +267,7 @@ declare namespace botkit {
   }
   type ConversationCallback<M extends Message> = (message: M, convo: Conversation<M>) => void | { pattern: string | RegExp, callback: (message: M, convo: Conversation<M>) => void }[];
   type ConversationStatusType = 'completed' | 'active' | 'stopped' | 'timeout' | 'ending' | 'inactive';
-  type HearsCallback<B, M extends Message> = (bot: B, message: M) => void;
+  type HearsCallback<M extends Message, B extends Bot<M>> = (bot: B, message: M) => void;
   type HearsFunction<M extends Message> = (tests: string | string[] | RegExp | RegExp[], message: M) => boolean;
   type SlackEventType = 'ambient' |
     'bot_channel_join' |
