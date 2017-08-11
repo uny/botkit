@@ -3,8 +3,9 @@ declare namespace botkit {
   function facebookbot(configuration: FacebookConfiguration): FacebookController;
   function slackbot(configuration: SlackConfiguration): SlackController;
   function sparkbot(configuration: CiscoSparkConfiguration): CiscoSparkController;
-  interface Bot<E, M extends Message> {
-    readonly botkit: Controller<E, M, this>;
+  function twiliosmsbot(configuration: TwilioSMSConfiguration): TwilioSMSController;
+  interface Bot<M extends Message> {
+    readonly botkit: Controller<M, this>;
     readonly identity: Identity;
     readonly utterances: {
       yes: RegExp;
@@ -16,9 +17,9 @@ declare namespace botkit {
     startConversation(message: M, cb: (err: Error, convo: Conversation<M>) => void): void;
   }
   interface Channel {
-    id: any;
+    id: string;
   }
-  interface CiscoSparkBot extends Bot<CiscoSparkEventType, CiscoSparkMessage> {
+  interface CiscoSparkBot extends Bot<CiscoSparkMessage> {
     retrieveFile(url: string, cb: (err: Error, body: any) => void): void;
     retrieveFileInfo(url: string, cb: (err: Error, obj: any) => void): void;
     startPrivateConversation(message: CiscoSparkMessage, cb: (err: Error, convo: Conversation<CiscoSparkMessage>) => void): void;
@@ -31,13 +32,16 @@ declare namespace botkit {
     limit_to_org?: string;
     public_address: string;
     secret?: string;
-    studio_token?: string;
     webhook_name?: string;
   }
-  interface CiscoSparkController extends Controller<CiscoSparkEventType, CiscoSparkMessage, CiscoSparkBot> {
+  interface CiscoSparkController extends Controller<CiscoSparkMessage, CiscoSparkBot> {
+    createWebhookEndpoints(webserver: any, bot: CiscoSparkBot, cb: () => void): this;
   }
   interface CiscoSparkMessage extends Message {
     actorId?: string;
+    data?: {
+      personDisplayName: string;
+    };
     files?: any[];
     markdown?: string;
     original_message?: CiscoSparkMessage;
@@ -53,16 +57,17 @@ declare namespace botkit {
       channels: Storage<Channel>;
       teams: Storage<Team>;
     };
+    studio_token?: string;
   }
-  interface ConsoleBot extends Bot<ConsoleEventType, ConsoleMessage> {
+  interface ConsoleBot extends Bot<ConsoleMessage> {
   }
   interface ConsoleConfiguration extends Configuration {
   }
-  interface ConsoleController extends Controller<ConsoleEventType, ConsoleMessage, ConsoleBot> {
+  interface ConsoleController extends Controller<ConsoleMessage, ConsoleBot> {
   }
   interface ConsoleMessage extends Message {
   }
-  interface Controller<E, M extends Message, B extends Bot<E, M>> {
+  interface Controller<M extends Message, B extends Bot<M>> {
     readonly storage: {
       users: Storage<User>;
       channels: Storage<Channel>;
@@ -71,10 +76,9 @@ declare namespace botkit {
     readonly log: {
       (...params: any[]): void;
     }
-    createWebhookEndpoints(webserver: any, authenticationTokens?: string[]): this;
-    hears(keywords: string | string[] | RegExp | RegExp[], events: string | string[], cb: HearsCallback<E, M, B>): this;
-    hears(keywords: string | string[] | RegExp | RegExp[], events: string | string[], middleware_or_cb: HearsFunction<M>, cb: HearsCallback<E, M, B>): this;
-    on(event: E, cb: HearsCallback<E, M, B>): this;
+    hears(keywords: string | string[] | RegExp | RegExp[], events: string | string[], cb: HearsCallback<M, B>): this;
+    hears(keywords: string | string[] | RegExp | RegExp[], events: string | string[], middleware_or_cb: HearsFunction<M>, cb: HearsCallback<M, B>): this;
+    on(event: string, cb: HearsCallback<M, B>): this;
     setupWebserver(port: number | string, cb: (err: Error, webserver: any) => void): this;
     spawn(config?: { token?: string; }, cb?: (worker: B) => void): B;
     startTicking(): void;
@@ -109,7 +113,7 @@ declare namespace botkit {
     type: 'audio' | 'file' | 'image' | 'video';
     payload: any;
   }
-  interface FacebookBot extends Bot<FacebookEventType, FacebookMessage> {
+  interface FacebookBot extends Bot<FacebookMessage> {
     replyWithTyping(src: FacebookMessage, resp: string | FacebookMessage, cb?: (err: Error) => void): void;
     startTyping(src: FacebookMessage, cb?: (err: Error) => void): void;
     stopTyping(src: FacebookMessage, cb?: (err: Error) => void): void;
@@ -122,7 +126,7 @@ declare namespace botkit {
     validate_requests?: boolean;
     verify_token: string;
   }
-  interface FacebookController extends Controller<FacebookEventType, FacebookMessage, FacebookBot> {
+  interface FacebookController extends Controller<FacebookMessage, FacebookBot> {
     readonly api: {
       attachment_upload: {
         upload(attachment: FacebookAttachment, cb: (err: Error, attachment_id: string) => void): void;
@@ -193,7 +197,7 @@ declare namespace botkit {
     title_link?: string;
     ts?: string;
   }
-  interface SlackBot extends Bot<SlackEventType, SlackMessage> {
+  interface SlackBot extends Bot<SlackMessage> {
     readonly api: SlackWebAPI;
     configureIncomingWebhook(config: { url: string; }): this;
     createConversationInThread(src: SlackMessage, cb: (err: Error, res: string) => void): void;
@@ -229,10 +233,11 @@ declare namespace botkit {
     send_via_rtm?: boolean;
     stale_connection_timeout?: number;
   }
-  interface SlackController extends Controller<SlackEventType, SlackMessage, SlackBot> {
+  interface SlackController extends Controller<SlackMessage, SlackBot> {
     configureSlackApp(config: { clientId: string; clientSecret: string; redirectUri: string; scopes: string[]; }): this;
     createHomepageEndpoint(webserver: any): this;
     createOauthEndpoints(webserver: any, callback: (err: Error, req: any, res: any) => void): this;
+    createWebhookEndpoints(webserver: any, authenticationTokens?: string[]): this;
     setupWebserver();
     getAuthorizeURL(team_id: string, redirect_params: any): string;
   }
@@ -388,59 +393,42 @@ declare namespace botkit {
     };
   }
   interface Storage<O> {
-    save: (data: O, cb?: (err: Error, id: any) => void) => void;
-    get: (id: any, cb: (err: Error, data: O) => void) => void;
-    delete?: (id: any, cb?: (err: Error) => void) => void;
+    save: (data: O, cb?: (err: Error, id: string) => void) => void;
+    get: (id: string, cb: (err: Error, data: O) => void) => void;
+    delete?: (id: string, cb?: (err: Error) => void) => void;
     all?: (cb: (err: Error, data: O[]) => void) => void;
   }
+  interface Studio<M extends Message, B extends Bot<M>> {
+    after(command_name: string, func: (convo: Conversation<M>, next: () => void) => void): this;
+    before(command_name: string, func: (convo: Conversation<M>, next: () => void) => void): this;
+    beforeThread(command_name: string, thread_name: string, func: (convo: Conversation<M>, next: () => void) => void): this;
+    get(bot: B, input_text: string, user: string, channel: string): Promise<Conversation<M>>;
+    run(bot: B, input_text: string, user: string, channel: string): Promise<Conversation<M>>;
+    runTrigger(bot: B, input_text: string, user: string, channel: string): Promise<Conversation<M>>;
+    validate(command_name: string, key: string, func: (convo: Conversation<M>, next: () => void) => void): this;
+  }
   interface Team {
-    id: any;
+    id: string;
+  }
+  interface TwilioSMSBot extends Bot<TwilioSMSMessage> {
+  }
+  interface TwilioSMSConfiguration extends Configuration {
+    account_sid: string;
+    auth_token: string;
+    twilio_number: string;
+  }
+  interface TwilioSMSController extends Controller<TwilioSMSMessage, TwilioSMSBot> {
+  }
+  interface TwilioSMSMessage extends Message {
   }
   interface User {
-    id: any;
+    id: string;
     name?: string;
   }
-  type CiscoSparkEventType = 'bot_space_join' |
-    'bot_space_leave' |
-    'direct_mention' |
-    'direct_message' |
-    'message_received' |
-    'self_message' |
-    'user_space_leave' |
-    'user_space_join';
-  type ConsoleEventType = 'message_received';
   type ConversationCallback<M extends Message> = ((message: M, convo: Conversation<M>) => void) | ({ pattern?: string | RegExp; default?: boolean; callback: (message: M, convo: Conversation<M>) => void; }[]);
   type ConversationStatusType = 'completed' | 'active' | 'stopped' | 'timeout' | 'ending' | 'inactive';
-  type FacebookEventType = 'facebook_account_linking' |
-    'facebook_optin' |
-    'facebook_postback' |
-    'facebook_referral' |
-    'message_delivered' |
-    'message_read' |
-    'message_received';
-  type HearsCallback<E, M extends Message, B extends Bot<E, M>> = (bot: B, message: M) => void;
+  type HearsCallback<M extends Message, B extends Bot<M>> = (bot: B, message: M) => void;
   type HearsFunction<M extends Message> = (tests: string | string[] | RegExp | RegExp[], message: M) => boolean;
-  type SlackEventType = 'ambient' |
-    'bot_channel_join' |
-    'bot_group_join' |
-    'create_bot' |
-    'create_incoming_webhook' |
-    'create_team' |
-    'create_user' |
-    'direct_mention' |
-    'direct_message' |
-    'mention' |
-    'message_received' |
-    'oauth_error' |
-    'outgoing_webhook' |
-    'rtm_close' |
-    'rtm_open' |
-    'rtm_reconnect_failed' |
-    'slash_command' |
-    'update_team' |
-    'update_user' |
-    'user_channel_join' |
-    'user_group_join';
   type SlackWebAPIMethod = (data: any, cb: (err: Error, response: any) => void) => void;
 }
 
