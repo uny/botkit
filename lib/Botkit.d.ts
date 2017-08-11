@@ -1,4 +1,5 @@
 declare namespace botkit {
+  function botframeworkbot(configuration: BotFrameworkConfiguration): BotFrameworkController;
   function consolebot(configuration: ConsoleConfiguration): ConsoleController;
   function facebookbot(configuration: FacebookConfiguration): FacebookController;
   function slackbot(configuration: SlackConfiguration): SlackController;
@@ -16,6 +17,19 @@ declare namespace botkit {
     createConversation(message: M, cb: (err: Error, convo: Conversation<M>) => void): void;
     reply(src: M, resp: string | M, cb?: (err: Error, res: any) => void): void;
     startConversation(message: M, cb: (err: Error, convo: Conversation<M>) => void): void;
+  }
+  interface BotFrameworkBot extends Bot<BotFrameworkSpawnConfiguration, BotFrameworkMessage> {
+  }
+  interface BotFrameworkConfiguration extends Configuration {
+  }
+  interface BotFrameworkController extends Controller<BotFrameworkSpawnConfiguration, BotFrameworkMessage, BotFrameworkBot> {
+    createWebhookEndpoints(webserver: any, bot: TwilioSMSBot, cb?: () => void): this;
+  }
+  interface BotFrameworkMessage extends Message {
+  }
+  interface BotFrameworkSpawnConfiguration {
+    appId: string;
+    appPassword: string;
   }
   interface Channel {
     id: string;
