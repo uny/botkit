@@ -2,7 +2,14 @@ declare namespace botkit {
   function consolebot(configuration: ConsoleConfiguration): ConsoleController;
   function slackbot(configuration: SlackConfiguration): SlackController;
   function sparkbot(configuration: CiscoSparkConfiguration): CiscoSparkController;
-  interface Bot<M extends Message> {
+  interface Bot<E, M extends Message> {
+    readonly botkit: Controller<E, M, this>;
+    readonly identity: Identity;
+    readonly utterances: {
+      yes: RegExp;
+      no: RegExp;
+      quit: RegExp;
+    };
     createConversation(message: M, cb: (err: Error, convo: Conversation<M>) => void): void;
     reply(src: M, resp: string | M, cb?: (err: Error, res: any) => void): void;
     startConversation(message: M, cb: (err: Error, convo: Conversation<M>) => void): void;
@@ -10,7 +17,7 @@ declare namespace botkit {
   interface Channel {
     id: any;
   }
-  interface CiscoSparkBot extends Bot<CiscoSparkMessage> {
+  interface CiscoSparkBot extends Bot<CiscoSparkEventType, CiscoSparkMessage> {
     retrieveFile(url: string, cb: (err: Error, body: any) => void): void;
     retrieveFileInfo(url: string, cb: (err: Error, obj: any) => void): void;
     startPrivateConversation(message: CiscoSparkMessage, cb: (err: Error, convo: Conversation<CiscoSparkMessage>) => void): void;
@@ -23,6 +30,7 @@ declare namespace botkit {
     limit_to_org?: string;
     public_address: string;
     secret?: string;
+    studio_token?: string;
     webhook_name?: string;
   }
   interface CiscoSparkController extends Controller<CiscoSparkEventType, CiscoSparkMessage, CiscoSparkBot> {
@@ -46,7 +54,7 @@ declare namespace botkit {
       teams: Storage<Team>;
     };
   }
-  interface ConsoleBot extends Bot<ConsoleMessage> {
+  interface ConsoleBot extends Bot<ConsoleEventType, ConsoleMessage> {
   }
   interface ConsoleConfiguration extends Configuration {
   }
@@ -55,15 +63,19 @@ declare namespace botkit {
   }
   interface ConsoleMessage extends Message {
   }
-  interface Controller<E, M extends Message, B extends Bot<M>> {
+  interface Controller<E, M extends Message, B extends Bot<E, M>> {
     readonly storage: {
       users: Storage<User>;
       channels: Storage<Channel>;
       teams: Storage<Team>;
     };
+    readonly log: {
+      (...params: any[]): void;
+    }
     createWebhookEndpoints(webserver: any, authenticationTokens?: string[]): this;
-    hears(keywords: string | string[] | RegExp | RegExp[], events: string | string[], middleware_or_cb: HearsFunction<M> | HearsCallback<M, B>, cb?: HearsCallback<M, B>): this;
-    on(event: E, cb: HearsCallback<M, B>): this;
+    hears(keywords: string | string[] | RegExp | RegExp[], events: string | string[], cb: HearsCallback<E, M, B>): this;
+    hears(keywords: string | string[] | RegExp | RegExp[], events: string | string[], middleware_or_cb: HearsFunction<M>, cb: HearsCallback<E, M, B>): this;
+    on(event: E, cb: HearsCallback<E, M, B>): this;
     setupWebserver(port: number | string, cb: (err: Error, webserver: any) => void): this;
     startTicking(): void;
   }
@@ -78,6 +90,7 @@ declare namespace botkit {
     extractResponses(): { [key: string]: string };
     gotoThread(thread: string): void;
     next(): void;
+    on(event: string, cb: (convo: this) => void): void;
     onTimeout(handler: (convo: this) => void): void;
     repeat(): void;
     say(message: string | M): void;
@@ -92,9 +105,14 @@ declare namespace botkit {
     key?: string;
     multiple?: boolean;
   }
+  interface Identity {
+    name: string;
+    emails: string[];
+  }
   interface Message {
     action?: string;
     channel?: string;
+    match?: RegExpMatchArray;
     text?: string;
     user?: string;
   }
@@ -119,7 +137,7 @@ declare namespace botkit {
     title_link?: string;
     ts?: string;
   }
-  interface SlackBot extends Bot<SlackMessage> {
+  interface SlackBot extends Bot<SlackEventType, SlackMessage> {
     readonly api: SlackWebAPI;
     configureIncomingWebhook(config: { url: string; }): this;
     createConversationInThread(src: SlackMessage, cb: (err: Error, res: string) => void): void;
@@ -173,6 +191,7 @@ declare namespace botkit {
     reply_broadcast?: boolean;
     type?: string;
     thread_ts?: string;
+    ts?: string;
     unfurl_links?: boolean;
     unfurl_media?: boolean;
     username?: string;
@@ -336,9 +355,9 @@ declare namespace botkit {
     'user_space_leave' |
     'user_space_join';
   type ConsoleEventType = 'message_received';
-  type ConversationCallback<M extends Message> = (message: M, convo: Conversation<M>) => void | { pattern: string | RegExp, callback: (message: M, convo: Conversation<M>) => void }[];
+  type ConversationCallback<M extends Message> = ((message: M, convo: Conversation<M>) => void) | ({ pattern?: string | RegExp; default?: boolean; callback: (message: M, convo: Conversation<M>) => void; }[]);
   type ConversationStatusType = 'completed' | 'active' | 'stopped' | 'timeout' | 'ending' | 'inactive';
-  type HearsCallback<M extends Message, B extends Bot<M>> = (bot: B, message: M) => void;
+  type HearsCallback<E, M extends Message, B extends Bot<E, M>> = (bot: B, message: M) => void;
   type HearsFunction<M extends Message> = (tests: string | string[] | RegExp | RegExp[], message: M) => boolean;
   type SlackEventType = 'ambient' |
     'bot_channel_join' |
@@ -364,4 +383,4 @@ declare namespace botkit {
   type SlackWebAPIMethod = (data: any, cb: (err: Error, response: any) => void) => void;
 }
 
-export = botkit;
+export default botkit;
