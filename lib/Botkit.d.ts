@@ -1,7 +1,7 @@
 declare namespace botkit {
   function consolebot(configuration: ConsoleConfiguration): ConsoleController;
   function slackbot(configuration: SlackConfiguration): SlackController;
-  // function sparkbot(configuration: Configuration): Controller;
+  function sparkbot(configuration: CiscoSparkConfiguration): CiscoSparkController;
   // function facebookbot(configuration: Configuration): Controller;
   // function twilioipmbot(configuration: Configuration): Controller;
   // function twiliosmsbot(configuration: Configuration): Controller;
@@ -10,6 +10,9 @@ declare namespace botkit {
     createConversation(message: M, cb: (err: Error, convo: Conversation<M>) => void): void;
     reply(src: M, resp: string | M, cb?: (err: Error, res: any) => void): void;
     startConversation(message: M, cb: (err: Error, convo: Conversation<M>) => void): void;
+  }
+  interface Channel {
+    id: any;
   }
   interface CiscoSparkBot extends Bot<CiscoSparkMessage> {
     retrieveFile(url: string, cb: (err: Error, body: any) => void): void;
@@ -38,7 +41,14 @@ declare namespace botkit {
   interface Configuration {
     debug?: boolean;
     hostname?: string;
+    json_file_store?: string;
     log?: boolean;
+    logger?: { log: Function; };
+    storage?: {
+      users: Storage<User>;
+      channels: Storage<Channel>;
+      teams: Storage<Team>;
+    };
   }
   interface ConsoleBot extends Bot<ConsoleMessage> {
   }
@@ -50,6 +60,11 @@ declare namespace botkit {
   interface ConsoleMessage extends Message {
   }
   interface Controller<E, M extends Message, B extends Bot<M>> {
+    readonly storage: {
+      users: Storage<User>;
+      channels: Storage<Channel>;
+      teams: Storage<Team>;
+    };
     createWebhookEndpoints(webserver: any, authenticationTokens?: string[]): this;
     hears(keywords: string | string[] | RegExp | RegExp[], events: string | string[], middleware_or_cb: HearsFunction<M> | HearsCallback<M, B>, cb?: HearsCallback<M, B>): this;
     on(event: E, cb: HearsCallback<M, B>): this;
@@ -302,6 +317,19 @@ declare namespace botkit {
           set: SlackWebAPIMethod;
         };
     };
+  }
+  interface Storage<O> {
+    save: (data: O, cb?: (err: Error, id: any) => void) => void;
+    get: (id: any, cb: (err: Error, data: O) => void) => void;
+    delete?: (id: any, cb?: (err: Error) => void) => void;
+    all?: (cb: (err: Error, data: O[]) => void) => void;
+  }
+  interface Team {
+    id: any;
+  }
+  interface User {
+    id: any;
+    name?: string;
   }
   type CiscoSparkEventType = 'bot_space_join' |
     'bot_space_leave' |
