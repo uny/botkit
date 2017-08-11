@@ -1,15 +1,53 @@
 declare namespace botkit {
+  function consolebot(configuration: ConsoleConfiguration): ConsoleController;
   function slackbot(configuration: SlackConfiguration): SlackController;
   // function sparkbot(configuration: Configuration): Controller;
   // function facebookbot(configuration: Configuration): Controller;
   // function twilioipmbot(configuration: Configuration): Controller;
   // function twiliosmsbot(configuration: Configuration): Controller;
   // function botframeworkbot(configuration: Configuration): Controller;
-  // function consolebot(configuration: Configuration): Controller;
   interface Bot<M extends Message> {
     createConversation(message: M, cb: (err: Error, convo: Conversation<M>) => void): void;
     reply(src: M, resp: string | M, cb?: (err: Error, res: any) => void): void;
     startConversation(message: M, cb: (err: Error, convo: Conversation<M>) => void): void;
+  }
+  interface CiscoSparkBot extends Bot<CiscoSparkMessage> {
+    retrieveFile(url: string, cb: (err: Error, body: any) => void): void;
+    retrieveFileInfo(url: string, cb: (err: Error, obj: any) => void): void;
+    startPrivateConversation(message: CiscoSparkMessage, cb: (err: Error, convo: Conversation<CiscoSparkMessage>) => void): void;
+    startPrivateConversationWithActor(message: CiscoSparkMessage, cb: (err: Error, convo: Conversation<CiscoSparkMessage>) => void): void;
+    startPrivateConversationWithPersonId(personId: string, cb: (err: Error, convo: Conversation<CiscoSparkMessage>) => void): void;
+  }
+  interface CiscoSparkConfiguration extends Configuration {
+    ciscospark_access_token: string;
+    limit_to_domain?: string | string[];
+    limit_to_org?: string;
+    public_address: string;
+    secret?: string;
+    webhook_name?: string;
+  }
+  interface CiscoSparkController extends Controller<CiscoSparkEventType, CiscoSparkMessage, CiscoSparkBot> {
+    spawn(config: {}, cb?: (worker: CiscoSparkBot) => void): CiscoSparkBot;
+  }
+  interface CiscoSparkMessage extends Message {
+    actorId?: string;
+    files?: any[];
+    markdown?: string;
+    original_message?: CiscoSparkMessage;
+  }
+  interface Configuration {
+    debug?: boolean;
+    hostname?: string;
+    log?: boolean;
+  }
+  interface ConsoleBot extends Bot<ConsoleMessage> {
+  }
+  interface ConsoleConfiguration extends Configuration {
+  }
+  interface ConsoleController extends Controller<ConsoleEventType, ConsoleMessage, ConsoleBot> {
+    spawn(config?: {}, cb?: (worker: ConsoleBot) => void): ConsoleBot;
+  }
+  interface ConsoleMessage extends Message {
   }
   interface Controller<E, M extends Message, B extends Bot<M>> {
     createWebhookEndpoints(webserver: any, authenticationTokens?: string[]): this;
@@ -45,7 +83,9 @@ declare namespace botkit {
   }
   interface Message {
     action?: string;
+    channel?: string;
     text?: string;
+    user?: string;
   }
   interface SlackAttachment {
     author_icon?: string;
@@ -91,11 +131,10 @@ declare namespace botkit {
     startConversationInThread(src: SlackMessage, cb: (err: Error, res: string) => void): void;
     startRTM(cb?: (err: string, bot: SlackBot, payload: any) => void): SlackBot;
   }
-  interface SlackConfiguration {
+  interface SlackConfiguration extends Configuration {
     api_root?: string;
     clientId?: string;
     clientSecret?: string;
-    debug?: boolean;
     disable_startup_messages?: boolean;
     incoming_webhook?: { url: string; };
     interactive_replies?: boolean;
@@ -112,11 +151,10 @@ declare namespace botkit {
     createOauthEndpoints(webserver: any, callback: (err: Error, req: any, res: any) => void): this;
     setupWebserver();
     getAuthorizeURL(team_id: string, redirect_params: any): string;
-    spawn(config: { token: string }): SlackBot;
+    spawn(config: { token: string }, cb?: (worker: SlackBot) => void): SlackBot;
   }
   interface SlackMessage extends Message {
     attachments?: SlackAttachment[];
-    channel?: string;
     icon_emoji?: string;
     icon_url?: string;
     link_names?: boolean;
@@ -265,6 +303,15 @@ declare namespace botkit {
         };
     };
   }
+  type CiscoSparkEventType = 'bot_space_join' |
+    'bot_space_leave' |
+    'direct_mention' |
+    'direct_message' |
+    'message_received' |
+    'self_message' |
+    'user_space_leave' |
+    'user_space_join';
+  type ConsoleEventType = 'message_received';
   type ConversationCallback<M extends Message> = (message: M, convo: Conversation<M>) => void | { pattern: string | RegExp, callback: (message: M, convo: Conversation<M>) => void }[];
   type ConversationStatusType = 'completed' | 'active' | 'stopped' | 'timeout' | 'ending' | 'inactive';
   type HearsCallback<M extends Message, B extends Bot<M>> = (bot: B, message: M) => void;
